@@ -8,3 +8,6 @@ __pycache__/
 dist/
 *.egg-info/
 CLAUDE.md
+.DS_Store
+.claude/
+tests/
