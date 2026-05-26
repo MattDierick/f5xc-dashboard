@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+
+{% block title %}Quota Dashboard – F5 XC{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Quota Dashboard</h1>
+  <p>Current quota usage across all object types in your F5 Distributed Cloud tenant.</p>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">{{ error | safe }}</div>
+{% endif %}
+
+{% if not quota_items and not error %}
+<div class="card">
+  <div class="empty-state">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="#ddd">
+      <path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-7 14H7v-2h5v2zm5-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+    </svg>
+    <p>No quota data available.</p>
+  </div>
+</div>
+
+{% elif quota_items %}
+
+{# ---- summary stat cards ---- #}
+{% set total_types = quota_items | length %}
+{% set exhausted = quota_items | selectattr("available", "eq", 0) | list | length %}
+{% set near_limit = quota_items | selectattr("usage_pct", "ge", 80) | selectattr("available", "gt", 0) | list | length %}
+
+<div class="stat-row">
+  <div class="stat-card">
+    <div class="label">Object Types</div>
+    <div class="value">{{ total_types }}</div>
+    <div class="sub">tracked quota entries</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Near Limit (≥80 %)</div>
+    <div class="value" style="color:{% if near_limit > 0 %}#f39c12{% else %}#2ecc71{% endif %}">
+      {{ near_limit }}
+    </div>
+    <div class="sub">types above 80 % usage</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Exhausted</div>
+    <div class="value" style="color:{% if exhausted > 0 %}#e74c3c{% else %}#2ecc71{% endif %}">
+      {{ exhausted }}
+    </div>
+    <div class="sub">types at limit</div>
+  </div>
+</div>
+
+{# ---- main table ---- #}
+<div class="card">
+  <div class="card-header" style="justify-content:space-between">
+    <span style="display:flex;align-items:center;gap:8px">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2zm-7 14H7v-2h5v2zm5-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+      </svg>
+      All Quota Entries
+      <span id="quota-count" style="font-weight:400;color:#aaa;font-size:12px"></span>
+    </span>
+    <span style="display:flex;align-items:center;gap:8px">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="#aaa">
+        <path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16a6.47 6.47 0 004.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+      </svg>
+      <input id="quota-filter"
+             type="text"
+             placeholder="Filter by object type…"
+             autocomplete="off"
+             style="padding:5px 10px;border:1px solid #d0d5dd;border-radius:6px;font-size:12px;
+                    width:220px;outline:none;color:#333"
+             onfocus="this.style.borderColor='#cc2222';this.style.boxShadow='0 0 0 3px rgba(204,34,34,0.12)'"
+             onblur="this.style.borderColor='#d0d5dd';this.style.boxShadow='none'"
+      />
+      <button id="quota-filter-clear"
+              title="Clear filter"
+              style="display:none;background:none;border:none;cursor:pointer;color:#aaa;font-size:16px;line-height:1;padding:2px 4px"
+              >✕</button>
+    </span>
+  </div>
+  <div class="table-wrap">
+    <table id="quota-table">
+      <thead>
+        <tr>
+          <th class="sortable" data-col="0" data-type="str" title="Sort by Object Type">
+            Object Type <span class="sort-icon">⇅</span>
+          </th>
+          <th class="sortable" data-col="1" data-type="num" style="text-align:right" title="Sort by Limit">
+            Limit <span class="sort-icon">⇅</span>
+          </th>
+          <th class="sortable" data-col="2" data-type="num" style="text-align:right" title="Sort by Used">
+            Used <span class="sort-icon">⇅</span>
+          </th>
+          <th class="sortable" data-col="3" data-type="num" style="text-align:right" title="Sort by Available">
+            Available <span class="sort-icon">⇅</span>
+          </th>
+          <th class="sortable" data-col="4" data-type="num" title="Sort by Usage %">
+            Usage <span class="sort-icon">⇅</span>
+          </th>
+          <th class="sortable" data-col="5" data-type="str" title="Sort by Status">
+            Status <span class="sort-icon">⇅</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in quota_items %}
+        <tr>
+          <td data-val="{{ (item.display_name or item.kind) | lower }}">
+            <span style="font-weight:500">{{ item.display_name or item.kind }}</span>
+            {% if item.display_name and item.display_name != item.kind %}
+            <br><code style="font-size:11px;color:#aaa">{{ item.kind }}</code>
+            {% endif %}
+          </td>
+          <td style="text-align:right;font-weight:600" data-val="{{ item.limit }}">
+            {% if item.limit == -1 %}
+            <span title="Unlimited" style="font-size:18px;color:#aaa;line-height:1">∞</span>
+            {% else %}
+            {{ item.limit }}
+            {% endif %}
+          </td>
+          <td style="text-align:right" data-val="{{ item.current_usage }}">{{ item.current_usage }}</td>
+          <td style="text-align:right;font-weight:600;
+            {% if item.limit != -1 %}
+              color:{% if item.available == 0 %}#e74c3c{% elif item.available < (item.limit * 0.2) %}#f39c12{% else %}#2ecc71{% endif %}
+            {% endif %}"
+              data-val="{{ item.available }}">
+            {% if item.limit == -1 %}
+            <span title="Unlimited" style="font-size:18px;color:#aaa;line-height:1">∞</span>
+            {% else %}
+            {{ item.available }}
+            {% endif %}
+          </td>
+          <td data-val="{{ item.usage_pct }}">
+            {% if item.limit == -1 or item.limit == 0 %}
+            <span style="color:#aaa;font-size:12px">-</span>
+            {% else %}
+            {# --- colour based on percentage --- #}
+            {% set p = item.usage_pct %}
+            {% if p >= 100 %}{% set fg = "#c0392b" %}{% set bg = "#fadbd8" %}{% set glow = "rgba(192,57,43,0.18)" %}
+            {% elif p >= 75 %}{% set fg = "#d35400" %}{% set bg = "#fde8d8" %}{% set glow = "rgba(211,84,0,0.15)" %}
+            {% elif p >= 50 %}{% set fg = "#d4ac0d" %}{% set bg = "#fef9e7" %}{% set glow = "rgba(212,172,13,0.15)" %}
+            {% elif p >= 25 %}{% set fg = "#1e8449" %}{% set bg = "#d5f5e3" %}{% set glow = "rgba(30,132,73,0.12)" %}
+            {% else %}{% set fg = "#1a7a3f" %}{% set bg = "#d5f5e3" %}{% set glow = "rgba(26,122,63,0.10)" %}{% endif %}
+            {# clamp fill width to 100% max #}
+            {% set fill = [p, 100] | min %}
+            {# outer track #}
+            <div style="display:inline-flex;align-items:center;gap:8px;vertical-align:middle">
+              <div style="position:relative;width:110px;height:12px;
+                          background:#eef0f5;border-radius:999px;overflow:hidden;
+                          box-shadow:inset 0 1px 3px rgba(0,0,0,0.08)">
+                {# filled portion #}
+                <div style="position:absolute;left:0;top:0;height:100%;
+                            width:{{ fill }}%;border-radius:999px;
+                            background:linear-gradient(90deg, {{ fg }}cc, {{ fg }});
+                            box-shadow:0 0 6px {{ glow }};
+                            transition:width 0.3s ease"></div>
+              </div>
+              {# percentage label with coloured pill background #}
+              <span style="display:inline-block;min-width:44px;text-align:center;
+                           padding:1px 7px;border-radius:999px;font-size:11px;
+                           font-weight:700;letter-spacing:0.2px;
+                           color:{{ fg }};background:{{ bg }};
+                           border:1px solid {{ fg }}33">{{ p }}%</span>
+            </div>
+            {% endif %}
+          </td>
+          <td data-val="{% if item.limit == -1 %}-1{% elif item.available == 0 %}2{% elif item.usage_pct >= 80 %}1{% else %}0{% endif %}">
+            {% if item.limit == -1 %}
+            <span class="badge badge-neutral">Unlimited</span>
+            {% elif item.available == 0 %}
+            <span class="badge badge-crit">Exhausted</span>
+            {% elif item.usage_pct >= 80 %}
+            <span class="badge badge-warn">Near Limit</span>
+            {% else %}
+            <span class="badge badge-ok">OK</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<style>
+  th.sortable {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  th.sortable:hover { background: #eef0f5; }
+  th.sortable.sort-asc  .sort-icon,
+  th.sortable.sort-desc .sort-icon { color: #cc2222; }
+  th.sortable .sort-icon { font-size: 11px; opacity: 0.4; margin-left: 4px; }
+  th.sortable.sort-asc  .sort-icon::after { content: "↑"; opacity: 1; }
+  th.sortable.sort-desc .sort-icon::after { content: "↓"; opacity: 1; }
+  th.sortable.sort-asc  .sort-icon,
+  th.sortable.sort-desc .sort-icon { font-size: 0; } /* hide ⇅, show override */
+  th.sortable.sort-asc  .sort-icon::after,
+  th.sortable.sort-desc .sort-icon::after { font-size: 13px; }
+</style>
+
+<script>
+(function () {
+  const table = document.getElementById('quota-table');
+  if (!table) return;
+
+  let sortCol = -1;
+  let sortAsc = true;
+
+  function applySort(col, asc) {
+    const th = table.querySelector('th.sortable[data-col="' + col + '"]');
+    const type = th ? th.dataset.type : 'num';
+
+    sortCol = col;
+    sortAsc = asc;
+
+    // Update header indicators
+    table.querySelectorAll('th.sortable').forEach(function (h) {
+      h.classList.remove('sort-asc', 'sort-desc');
+    });
+    if (th) th.classList.add(asc ? 'sort-asc' : 'sort-desc');
+
+    // Sort rows
+    const tbody = table.tBodies[0];
+    const rows = Array.from(tbody.rows);
+    rows.sort(function (a, b) {
+      const av = a.cells[col].dataset.val || '';
+      const bv = b.cells[col].dataset.val || '';
+      let cmp;
+      if (type === 'num') {
+        cmp = parseFloat(av) - parseFloat(bv);
+      } else {
+        cmp = av.localeCompare(bv);
+      }
+      return asc ? cmp : -cmp;
+    });
+    rows.forEach(function (r) { tbody.appendChild(r); });
+    updateCount();
+  }
+
+  table.querySelectorAll('th.sortable').forEach(function (th) {
+    th.addEventListener('click', function () {
+      const col = parseInt(th.dataset.col, 10);
+      const asc = sortCol === col ? !sortAsc : true;
+      applySort(col, asc);
+    });
+  });
+
+  // Default sort: Usage (col 4) descending
+  applySort(4, false);
+
+  /* ------------------------------------------------------------------ */
+  /* Filter                                                               */
+  /* ------------------------------------------------------------------ */
+  const filterInput = document.getElementById('quota-filter');
+  const filterClear = document.getElementById('quota-filter-clear');
+  const countLabel  = document.getElementById('quota-count');
+  const totalRows   = table.tBodies[0].rows.length;
+
+  function updateCount() {
+    const visible = Array.from(table.tBodies[0].rows)
+      .filter(function (r) { return r.style.display !== 'none'; }).length;
+    if (filterInput && filterInput.value.trim()) {
+      countLabel.textContent = visible + ' / ' + totalRows;
+    } else {
+      countLabel.textContent = totalRows + ' entries';
+    }
+  }
+
+  function applyFilter() {
+    const q = filterInput.value.trim().toLowerCase();
+    filterClear.style.display = q ? 'inline' : 'none';
+    Array.from(table.tBodies[0].rows).forEach(function (row) {
+      /* col 0 data-val holds the lowercase object type name */
+      const name = (row.cells[0].dataset.val || '').toLowerCase();
+      row.style.display = name.includes(q) ? '' : 'none';
+    });
+    updateCount();
+  }
+
+  if (filterInput) {
+    filterInput.addEventListener('input', applyFilter);
+    filterClear.addEventListener('click', function () {
+      filterInput.value = '';
+      applyFilter();
+      filterInput.focus();
+    });
+    updateCount();
+  }
+})();
+</script>
+{% endif %}
+{% endblock %}

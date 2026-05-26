@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Settings – F5 XC Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Settings</h1>
+  <p>Configure your F5 Distributed Cloud connection. Settings are kept in memory and reset on restart.</p>
+</div>
+
+{% if saved %}
+<div class="alert alert-success">
+  ✓ Settings saved successfully. You can now <a href="/" style="color:#1a6b3a;font-weight:600">view the quota dashboard</a>.
+</div>
+{% endif %}
+
+<div class="card" style="max-width:600px">
+  <div class="card-header">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.06-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96a7.01 7.01 0 00-1.62-.94l-.36-2.54A.484.484 0 0014 2h-4a.485.485 0 00-.48.41l-.36 2.54a7.01 7.01 0 00-1.62.94l-2.39-.96a.477.477 0 00-.59.22L2.74 8.87a.47.47 0 00.12.61l2.03 1.58c-.04.3-.06.62-.06.94s.02.64.06.94l-2.03 1.58a.47.47 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.36 1.04.67 1.62.94l.36 2.54c.05.24.27.41.48.41h4c.22 0 .43-.17.47-.41l.36-2.54a7.01 7.01 0 001.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.47.47 0 00-.12-.61l-2.03-1.58zM12 15.6a3.6 3.6 0 110-7.2 3.6 3.6 0 010 7.2z"/>
+    </svg>
+    Connection Settings
+  </div>
+
+  <form method="post" action="/settings" style="padding:24px">
+
+    <div class="form-group">
+      <label for="tenant">Tenant Name</label>
+      <input
+        type="text"
+        id="tenant"
+        name="tenant"
+        value="{{ tenant | default('') }}"
+        placeholder="my-company"
+        autocomplete="off"
+        required
+      />
+      <p class="form-hint">
+        The subdomain of your F5 XC console URL:
+        <code>https://<strong>[tenant]</strong>.console.ves.volterra.io</code>
+      </p>
+    </div>
+
+    <div class="form-group">
+      <label for="api_token">API Token</label>
+      <input
+        type="password"
+        id="api_token"
+        name="api_token"
+        placeholder="Paste your API token here"
+        autocomplete="off"
+        required
+      />
+      <p class="form-hint">
+        Generated in F5 XC Console → Administration → Credentials → API Token.
+        The token is never stored on disk.
+      </p>
+    </div>
+
+    <div style="display:flex;gap:12px;align-items:center;margin-top:8px">
+      <button type="submit" class="btn btn-primary">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M17 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V7l-4-4zm-5 16a3 3 0 110-6 3 3 0 010 6zm3-10H5V5h10v4z"/>
+        </svg>
+        Save Settings
+      </button>
+      <a href="/" class="btn btn-secondary">Cancel</a>
+    </div>
+
+  </form>
+</div>
+
+<div style="margin-top:28px;max-width:600px">
+  <div class="card-header" style="border-radius:10px 10px 0 0;background:#fff;border:1px solid #eef0f3;border-bottom:none">
+    Environment variables (alternative)
+  </div>
+  <div style="background:#f8f9fb;border:1px solid #eef0f3;border-top:none;border-radius:0 0 10px 10px;padding:16px 20px">
+    <p style="font-size:12px;color:#666;line-height:1.6;margin-bottom:10px">
+      Instead of the form above, you can pre-configure the app by setting these environment variables
+      before startup. The form always takes precedence once submitted.
+    </p>
+    <pre style="font-size:12px;background:#1a1a2e;color:#a8e6cf;padding:14px 16px;border-radius:7px;overflow-x:auto">F5_XC_TENANT=my-tenant
+F5_XC_API_TOKEN=your-token-here
+F5_XC_DEFAULT_NAMESPACE=default
+F5_XC_TIMEOUT_SECONDS=30</pre>
+  </div>
+</div>
+{% endblock %}

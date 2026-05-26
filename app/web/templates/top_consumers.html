@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Top Consumers – F5 XC{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Top Consumers</h1>
+  <p>Select an object type to see the top 10 namespaces with the highest object count.</p>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">{{ error | safe }}</div>
+{% endif %}
+
+{# ---- object type selector ---- #}
+<div class="card" style="margin-bottom:24px;padding:20px">
+  <form id="tc-form" method="post" action="/top-consumers">
+    <input type="hidden" id="tc-kind" name="kind" value="">
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+      <label style="margin-bottom:0;white-space:nowrap;font-weight:600;font-size:13px">Object Type:</label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        {% for label, kind in object_types.items() %}
+        <button type="button"
+                data-kind="{{ kind }}"
+                data-label="{{ label }}"
+                class="btn {% if kind == selected_kind %}btn-primary{% else %}btn-secondary{% endif %}"
+                style="font-size:12px;padding:7px 14px">
+          {{ label }}
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+  </form>
+</div>
+
+{# ---- loading overlay ---- #}
+<div id="tc-loading" style="display:none;margin-bottom:24px">
+  <div style="display:flex;align-items:center;gap:14px;padding:18px 22px;
+              background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,0.08)">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#cc2222"
+         stroke-width="2.5" stroke-linecap="round"
+         style="animation:tc-spin 0.9s linear infinite;flex-shrink:0">
+      <circle cx="12" cy="12" r="10" stroke="#edf0f5"/>
+      <path d="M12 2a10 10 0 0 1 10 10" stroke="#cc2222"/>
+    </svg>
+    <div>
+      <div style="font-weight:600;font-size:13px;color:#1a1a2e">
+        Collecting metrics across all namespaces…
+      </div>
+      <div id="tc-loading-label" style="font-size:12px;color:#888;margin-top:2px">
+        Querying all namespaces, please wait.
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  @keyframes tc-spin {
+    to { transform: rotate(360deg); }
+  }
+</style>
+
+<script>
+(function () {
+  var form = document.getElementById('tc-form');
+  var kindInput = document.getElementById('tc-kind');
+  var overlay = document.getElementById('tc-loading');
+  var loadingLabel = document.getElementById('tc-loading-label');
+
+  if (!form) return;
+
+  form.querySelectorAll('button[data-kind]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      /* 1. Write the selected kind into the hidden field */
+      kindInput.value = btn.dataset.kind;
+
+      /* 2. Update the loading message */
+      loadingLabel.textContent =
+        'Querying all namespaces for "' + btn.dataset.label + '", please wait…';
+
+      /* 3. Show overlay and disable buttons to prevent double-submit */
+      overlay.style.display = 'block';
+      form.querySelectorAll('button').forEach(function (b) {
+        b.disabled = true;
+        b.style.opacity = '0.5';
+      });
+
+      /* 4. Submit the form */
+      form.submit();
+    });
+  });
+})();
+</script>
+
+{# ---- results ---- #}
+{% if result %}
+
+{# summary #}
+<div class="stat-row" style="margin-bottom:24px">
+  <div class="stat-card">
+    <div class="label">Object Type</div>
+    <div class="value" style="font-size:20px">{{ result.label }}</div>
+    <div class="sub"><code style="font-size:11px">{{ result.kind }}</code></div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Namespaces Scanned</div>
+    <div class="value">{{ result.total_namespaces_scanned }}</div>
+    <div class="sub">total namespaces</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Total Objects (top 10)</div>
+    <div class="value">{{ result.top | sum(attribute='count') }}</div>
+    <div class="sub">across top namespaces</div>
+  </div>
+</div>
+
+{% if result.top and result.top[0].count > 0 %}
+<div class="card">
+  <div class="card-header">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+    </svg>
+    Top 10 Namespaces – {{ result.label }}
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:48px">Rank</th>
+          <th>Namespace</th>
+          <th style="text-align:right">Count</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in result.top %}
+        {% if entry.count > 0 %}
+        <tr>
+          <td style="color:#aaa;font-weight:600;font-size:13px">
+            {% if loop.index == 1 %}
+            <span style="color:#f1c40f;font-size:16px">🥇</span>
+            {% elif loop.index == 2 %}
+            <span style="color:#aaa;font-size:16px">🥈</span>
+            {% elif loop.index == 3 %}
+            <span style="color:#cd7f32;font-size:16px">🥉</span>
+            {% else %}
+            <span style="padding-left:4px">#{{ loop.index }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <a href="/namespaces"
+               onclick="sessionStorage.setItem('preselect_ns','{{ entry.namespace }}');return true;"
+               style="font-weight:500;color:#cc2222;text-decoration:none"
+               title="View all objects in this namespace">
+              {{ entry.namespace }}
+            </a>
+          </td>
+          <td style="text-align:right;font-weight:700;font-size:15px">{{ entry.count }}</td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% else %}
+<div class="card">
+  <div class="empty-state">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="#ddd">
+      <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+    </svg>
+    <p>No <strong>{{ result.label }}</strong> objects found in any namespace.</p>
+  </div>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

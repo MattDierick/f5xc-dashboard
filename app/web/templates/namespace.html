@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block title %}Namespace Objects – F5 XC{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Namespace Object Counts</h1>
+  <p>Select a namespace to see how many of each tracked object type have been created.</p>
+</div>
+
+{% if error %}
+<div class="alert alert-danger">{{ error | safe }}</div>
+{% endif %}
+
+{# ---- namespace selector ---- #}
+<div class="card" style="margin-bottom:24px;padding:20px;overflow:visible">
+  {% if namespaces %}
+  {# Hidden form – submitted by JS when a namespace is picked #}
+  <form id="ns-form" method="post" action="/namespaces" style="display:none">
+    <input type="hidden" id="ns-hidden" name="namespace" value="{{ selected_ns or '' }}">
+  </form>
+
+  <div class="ns-selector" style="position:relative">
+    <label for="ns-search" style="margin-bottom:0;white-space:nowrap">Namespace:</label>
+
+    <div style="position:relative;width:320px">
+      {# Search input #}
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="#aaa"
+           style="position:absolute;left:9px;top:50%;transform:translateY(-50%);pointer-events:none">
+        <path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16a6.47 6.47 0 004.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+      </svg>
+      <input id="ns-search"
+             type="text"
+             autocomplete="off"
+             placeholder="Search namespace…"
+             value="{{ selected_ns or '' }}"
+             style="width:100%;padding:8px 10px 8px 30px;border:1px solid #d0d5dd;border-radius:7px;
+                    font-size:13px;color:#333;outline:none"
+             onfocus="this.style.borderColor='#cc2222';this.style.boxShadow='0 0 0 3px rgba(204,34,34,0.12)';showDropdown()"
+             onblur="this.style.borderColor='#d0d5dd';this.style.boxShadow='none';setTimeout(hideDropdown,150)"
+             oninput="filterDropdown(this.value)"
+      />
+
+      {# Dropdown list #}
+      <ul id="ns-dropdown"
+          style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;
+                 background:#fff;border:1px solid #d0d5dd;border-radius:7px;
+                 box-shadow:0 4px 12px rgba(0,0,0,0.1);max-height:240px;overflow-y:auto;
+                 list-style:none;margin:0;padding:4px 0;z-index:200">
+        {% for ns in namespaces %}
+        <li data-ns="{{ ns }}"
+            style="padding:8px 14px;font-size:13px;cursor:pointer;color:#333"
+            onmouseenter="this.style.background='#f4f6f9'"
+            onmouseleave="this.style.background=''"
+            onclick="selectNamespace('{{ ns }}')">
+          {{ ns }}
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    {% if selected_ns %}
+    <span style="font-size:12px;color:#888">
+      Showing results for
+      <code style="background:#edf0f5;padding:1px 6px;border-radius:4px">{{ selected_ns }}</code>
+    </span>
+    {% endif %}
+  </div>
+
+  {% else %}
+  <span style="color:#aaa;font-size:13px">
+    {% if not error %}No namespaces available – configure credentials in <a href="/settings" style="color:#cc2222">Settings</a>.{% endif %}
+  </span>
+  {% endif %}
+</div>
+
+<script>
+(function () {
+  var items = document.querySelectorAll('#ns-dropdown li');
+
+  window.showDropdown = function () {
+    filterDropdown(document.getElementById('ns-search').value);
+    document.getElementById('ns-dropdown').style.display = 'block';
+  };
+
+  window.hideDropdown = function () {
+    document.getElementById('ns-dropdown').style.display = 'none';
+  };
+
+  window.filterDropdown = function (q) {
+    var term = q.trim().toLowerCase();
+    var anyVisible = false;
+    items.forEach(function (li) {
+      var match = li.dataset.ns.toLowerCase().includes(term);
+      li.style.display = match ? '' : 'none';
+      if (match) anyVisible = true;
+    });
+    document.getElementById('ns-dropdown').style.display = anyVisible ? 'block' : 'none';
+  };
+
+  window.selectNamespace = function (ns) {
+    document.getElementById('ns-search').value = ns;
+    document.getElementById('ns-hidden').value = ns;
+    document.getElementById('ns-dropdown').style.display = 'none';
+    document.getElementById('ns-form').submit();
+  };
+
+  /* Keyboard navigation */
+  document.getElementById('ns-search').addEventListener('keydown', function (e) {
+    var visible = Array.from(items).filter(function (li) {
+      return li.style.display !== 'none';
+    });
+    if (e.key === 'Enter' && visible.length === 1) {
+      selectNamespace(visible[0].dataset.ns);
+    }
+    if (e.key === 'Escape') { hideDropdown(); }
+  });
+})();
+</script>
+
+{# ---- results table ---- #}
+{% if object_counts %}
+<div class="page-header" style="margin-bottom:16px">
+  <h1 style="font-size:17px">
+    Results for namespace:
+    <code style="background:#edf0f5;padding:2px 8px;border-radius:5px;font-size:15px">{{ object_counts.namespace }}</code>
+  </h1>
+</div>
+
+{# stat row #}
+{% set total = object_counts.objects | sum(attribute='count') %}
+<div class="stat-row">
+  {% for obj in object_counts.objects %}
+  <div class="stat-card">
+    <div class="label">{{ obj.label }}</div>
+    <div class="value">{{ obj.count }}</div>
+    <div class="sub">objects</div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M10 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V8a2 2 0 00-2-2h-8l-2-2z"/>
+    </svg>
+    Object Counts – {{ object_counts.namespace }}
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Object Type</th>
+          <th>API Kind</th>
+          <th style="text-align:right">Count</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for obj in object_counts.objects %}
+        <tr>
+          <td><strong>{{ obj.label }}</strong></td>
+          <td><code style="font-size:12px;color:#555">{{ obj.kind }}</code></td>
+          <td style="text-align:right;font-weight:700;font-size:15px">
+            {% if obj.count > 0 %}
+            <span style="color:#1a1a2e">{{ obj.count }}</span>
+            {% else %}
+            <span style="color:#aaa">0</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr style="background:#f8f9fb">
+          <td colspan="2" style="font-weight:600;padding:10px 16px">Total</td>
+          <td style="text-align:right;font-weight:700;font-size:16px;padding:10px 16px">{{ total }}</td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+
+{% elif selected_ns and not error %}
+<div class="card">
+  <div class="empty-state">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="#ddd">
+      <path d="M10 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V8a2 2 0 00-2-2h-8l-2-2z"/>
+    </svg>
+    <p>No data returned for namespace <strong>{{ selected_ns }}</strong>.</p>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
