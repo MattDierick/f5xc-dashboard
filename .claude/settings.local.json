@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "WebFetch(domain:docs.cloud.f5.com)",
-      "WebSearch",
-      "Bash(pip install *)"
-    ]
-  }
-}
