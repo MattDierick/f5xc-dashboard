@@ -6,6 +6,8 @@ A web dashboard for viewing F5 Distributed Cloud resources — quota usage, name
 
 ![Dashboard screenshot](pictures/consumers.png)
 
+![Dashboard screenshot](pictures/ns.png)
+
 ## Running with Docker
 
 ### Pull the image
