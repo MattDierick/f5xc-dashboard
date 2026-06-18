@@ -18,6 +18,7 @@ import logging
 
 from app.clients.f5_xc_client import F5XCClient
 from app.models.top_consumers import NamespaceCount, TopConsumersResult
+from app.services.csd import CSD_KIND, _count_protected_domains
 from app.services.namespace_objects import (
     _count_objects,
     fetch_namespaces,
@@ -26,6 +27,7 @@ from app.services.namespace_objects import (
 logger = logging.getLogger(__name__)
 
 TOP_N = 10
+
 
 
 async def fetch_top_consumers(
@@ -46,8 +48,16 @@ async def fetch_top_consumers(
     """
     namespaces = await fetch_namespaces(client)
 
+    # CSD protected domains live under a different service prefix
+    # (/api/shape/csd) so they need a dedicated counter.
+    if kind == CSD_KIND:
+        counter = _count_protected_domains
+    else:
+        def counter(c: F5XCClient, ns: str) -> object:  # type: ignore[misc]
+            return _count_objects(c, ns, kind)
+
     # Query all namespaces concurrently
-    tasks = [_count_objects(client, ns, kind) for ns in namespaces]
+    tasks = [counter(client, ns) for ns in namespaces]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     counts: list[NamespaceCount] = []

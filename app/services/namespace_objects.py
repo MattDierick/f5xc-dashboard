@@ -75,8 +75,17 @@ async def fetch_object_counts(
         A :class:`~app.models.namespace.NamespaceObjectCounts` instance with
         one :class:`~app.models.namespace.ObjectCount` per tracked type.
     """
+    # Imported lazily to avoid a circular import (csd imports from this module).
+    from app.services.csd import CSD_KIND, _count_protected_domains
+
+    def _count_for(kind: str):
+        # CSD protected domains live under a different service prefix.
+        if kind == CSD_KIND:
+            return _count_protected_domains(client, namespace)
+        return _count_objects(client, namespace, kind)
+
     tasks = {
-        label: _count_objects(client, namespace, kind)
+        label: _count_for(kind)
         for label, kind in OBJECT_TYPE_TO_KIND.items()
     }
 

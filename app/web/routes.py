@@ -176,6 +176,7 @@ async def top_consumers_page(request: Request) -> HTMLResponse:
             "selected_kind": None,
             "selected_label": None,
             "result": None,
+            "csd_result": None,
             "error": None,
         },
     )

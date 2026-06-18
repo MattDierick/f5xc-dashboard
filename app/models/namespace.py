@@ -12,6 +12,7 @@ TRACKED_OBJECT_TYPES: list[str] = [
     "Virtual Host",
     "Service Policy",
     "Route",
+    "CSD - Client Side Defense",
 ]
 
 # Maps display label → API kind (path segment used in /api/config/namespaces/{ns}/{kind})
@@ -23,7 +24,11 @@ OBJECT_TYPE_TO_KIND: dict[str, str] = {
     "Virtual Host": "virtual_hosts",
     "Service Policy": "service_policys",
     "Route": "routes",
+    # CSD lives under a different service prefix (/api/shape/csd) - handled
+    # specially by the top-consumers service.
+    "CSD - Client Side Defense": "protected_domains",
 }
+
 
 
 class ObjectCount(BaseModel):
